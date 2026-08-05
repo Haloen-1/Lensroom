@@ -99,14 +99,22 @@ export default function Studio() {
     const form = event.currentTarget;
     const data = new FormData(form);
     setStatus("Uploading");
-    const response = await fetch("/api/photos", { method: "POST", body: data });
-    const result = await response.json().catch(() => ({}));
-    setStatus(response.ok ? "Saved" : result.error ?? "Could not save the photo");
-    if (response.ok) {
-      form.reset();
-      setSelectedFileName("");
-      loadPhotos();
-      loadTopics();
+    try {
+      const response = await fetch("/api/photos", {
+        method: "POST",
+        body: data,
+        credentials: "same-origin",
+      });
+      const result = await response.json().catch(() => ({}));
+      setStatus(response.ok ? "Saved" : result.error ?? `Could not save the photo. Status ${response.status}.`);
+      if (response.ok) {
+        form.reset();
+        setSelectedFileName("");
+        loadPhotos();
+        loadTopics();
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? `Could not save the photo. ${error.message}` : "Could not save the photo.");
     }
   }
 

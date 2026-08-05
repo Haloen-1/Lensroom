@@ -20,6 +20,19 @@ type PhotoRow = {
   created_at: string;
 };
 
+async function supabaseErrorMessage(response: Response, fallback: string) {
+  const body = await response.text().catch(() => "");
+
+  if (!body) return fallback;
+
+  try {
+    const parsed = JSON.parse(body) as { error?: string; message?: string; msg?: string };
+    return parsed.message || parsed.error || parsed.msg || fallback;
+  } catch {
+    return body.slice(0, 240);
+  }
+}
+
 function serialize(row: PhotoRow) {
   return {
     id: row.id,
@@ -67,7 +80,15 @@ export async function POST(request: Request) {
 
     const upload = await uploadPhotoFile(storagePath, file);
     if (!upload.ok) {
-      return Response.json({ error: "The photo file could not be uploaded to Supabase storage." }, { status: 500 });
+      return Response.json(
+        {
+          error: `The photo file could not be uploaded to Supabase storage. ${await supabaseErrorMessage(
+            upload,
+            "Check the storage bucket name and service role key.",
+          )}`,
+        },
+        { status: 500 },
+      );
     }
 
     const insert = await supabaseRequest("/rest/v1/photos?select=*", {
@@ -86,7 +107,15 @@ export async function POST(request: Request) {
     });
 
     if (!insert.ok) {
-      return Response.json({ error: "The photo labels could not be saved to Supabase." }, { status: 500 });
+      return Response.json(
+        {
+          error: `The photo labels could not be saved to Supabase. ${await supabaseErrorMessage(
+            insert,
+            "Check that supabase-schema.sql was run.",
+          )}`,
+        },
+        { status: 500 },
+      );
     }
 
     const inserted = ((await insert.json()) as PhotoRow[])[0];
