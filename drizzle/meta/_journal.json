@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1784349445286,
+      "tag": "0000_many_toad_men",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784789541602,
+      "tag": "0001_uneven_legion",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785552215806,
+      "tag": "0002_magical_thor_girl",
+      "breakpoints": true
+    }
+  ]
+}
