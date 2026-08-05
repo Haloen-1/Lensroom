@@ -98,21 +98,62 @@ export default function Studio() {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    const file = data.get("photo");
     setStatus("Uploading");
+
+    if (!(file instanceof File) || !file.type.startsWith("image/")) {
+      setStatus("Choose an image file first.");
+      return;
+    }
+
     try {
+      const signedUrlResponse = await fetch("/api/photos/upload-url", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      });
+      const signedUrlResult = await signedUrlResponse.json().catch(() => ({}));
+
+      if (!signedUrlResponse.ok || !signedUrlResult.signedUrl || !signedUrlResult.storagePath) {
+        setStatus(signedUrlResult.error ?? `Could not prepare the photo upload. Status ${signedUrlResponse.status}.`);
+        return;
+      }
+
+      const storageResponse = await fetch(signedUrlResult.signedUrl, {
+        method: "PUT",
+        headers: { "content-type": file.type },
+        body: file,
+      });
+
+      if (!storageResponse.ok) {
+        setStatus(`Could not upload the photo to Supabase storage. Status ${storageResponse.status}.`);
+        return;
+      }
+
       const response = await fetch("/api/photos", {
         method: "POST",
-        body: data,
+        headers: { "content-type": "application/json" },
         credentials: "same-origin",
+        body: JSON.stringify({
+          storagePath: signedUrlResult.storagePath,
+          filename: file.name,
+          title: String(data.get("title") || file.name),
+          category: String(data.get("category") || "Unsorted"),
+          labels: String(data.get("labels") || ""),
+          notes: String(data.get("notes") || ""),
+          contentType: file.type,
+          size: file.size,
+        }),
       });
       const result = await response.json().catch(() => ({}));
       setStatus(response.ok ? "Saved" : result.error ?? `Could not save the photo. Status ${response.status}.`);
-      if (response.ok) {
-        form.reset();
-        setSelectedFileName("");
-        loadPhotos();
-        loadTopics();
-      }
+      if (!response.ok) return;
+
+      form.reset();
+      setSelectedFileName("");
+      loadPhotos();
+      loadTopics();
     } catch (error) {
       setStatus(error instanceof Error ? `Could not save the photo. ${error.message}` : "Could not save the photo.");
     }

@@ -43,6 +43,21 @@ export function publicStorageUrl(path: string) {
   return `${config.url}/storage/v1/object/public/${config.bucket}/${path}`;
 }
 
+export async function createSignedUploadUrl(path: string) {
+  const config = getSupabaseConfig();
+  if (!config) throw new Error("Missing Supabase configuration");
+
+  return fetch(`${config.url}/storage/v1/object/upload/sign/${config.bucket}/${encodeURIComponent(path)}`, {
+    method: "POST",
+    headers: {
+      apikey: config.serviceRoleKey,
+      authorization: `Bearer ${config.serviceRoleKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ expiresIn: 600 }),
+  });
+}
+
 export async function uploadPhotoFile(path: string, file: File) {
   const config = getSupabaseConfig();
   if (!config) throw new Error("Missing Supabase configuration");

@@ -45,6 +45,32 @@ function serialize(row: PhotoRow) {
   };
 }
 
+async function insertPhotoMetadata(photo: {
+  storagePath: string;
+  filename: string;
+  title: string;
+  category: string;
+  labels: string;
+  notes: string;
+  contentType: string;
+  size: number;
+}) {
+  return supabaseRequest("/rest/v1/photos?select=*", {
+    method: "POST",
+    headers: { prefer: "return=representation" },
+    body: JSON.stringify({
+      storage_path: photo.storagePath,
+      filename: photo.filename,
+      title: photo.title,
+      category: photo.category,
+      labels: photo.labels,
+      notes: photo.notes,
+      content_type: photo.contentType,
+      size: photo.size,
+    }),
+  });
+}
+
 export async function GET() {
   if (!getSupabaseConfig()) return missingSupabaseResponse();
   const response = await supabaseRequest(
@@ -65,6 +91,52 @@ export async function POST(request: Request) {
   if (!getSupabaseConfig()) return missingSupabaseResponse();
 
   try {
+    if (request.headers.get("content-type")?.includes("application/json")) {
+      const body = (await request.json()) as {
+        storagePath?: unknown;
+        filename?: unknown;
+        title?: unknown;
+        category?: unknown;
+        labels?: unknown;
+        notes?: unknown;
+        contentType?: unknown;
+        size?: unknown;
+      };
+      const storagePath = String(body.storagePath || "").trim();
+      const filename = String(body.filename || "").trim();
+      const contentType = String(body.contentType || "").trim();
+
+      if (!storagePath || !filename || !contentType.startsWith("image/")) {
+        return Response.json({ error: "The uploaded photo details were incomplete." }, { status: 400 });
+      }
+
+      const insert = await insertPhotoMetadata({
+        storagePath,
+        filename,
+        title: String(body.title || filename).trim() || "Untitled",
+        category: String(body.category || "Unsorted").trim() || "Unsorted",
+        labels: String(body.labels || "").trim(),
+        notes: String(body.notes || "").trim(),
+        contentType,
+        size: Number(body.size) || 0,
+      });
+
+      if (!insert.ok) {
+        return Response.json(
+          {
+            error: `The photo labels could not be saved to Supabase. ${await supabaseErrorMessage(
+              insert,
+              "Check that supabase-schema.sql was run.",
+            )}`,
+          },
+          { status: 500 },
+        );
+      }
+
+      const inserted = ((await insert.json()) as PhotoRow[])[0];
+      return Response.json({ photo: inserted ? serialize(inserted) : null }, { status: 201 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("photo");
 
@@ -91,19 +163,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const insert = await supabaseRequest("/rest/v1/photos?select=*", {
-      method: "POST",
-      headers: { prefer: "return=representation" },
-      body: JSON.stringify({
-        storage_path: storagePath,
-        filename: file.name,
-        title,
-        category,
-        labels,
-        notes,
-        content_type: file.type,
-        size: file.size,
-      }),
+    const insert = await insertPhotoMetadata({
+      storagePath,
+      filename: file.name,
+      title,
+      category,
+      labels,
+      notes,
+      contentType: file.type,
+      size: file.size,
     });
 
     if (!insert.ok) {
