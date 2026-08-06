@@ -7,9 +7,16 @@ type SupabaseConfig = {
 };
 
 export function getSupabaseConfig(): SupabaseConfig | null {
-  const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const bucket = process.env.SUPABASE_STORAGE_BUCKET || defaultBucket;
+  const rawUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = rawUrl?.replace(/\/$/, "");
+  const serviceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE;
+  const bucket =
+    process.env.SUPABASE_STORAGE_BUCKET ||
+    process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ||
+    defaultBucket;
 
   if (!url || !serviceRoleKey) return null;
   return { url, serviceRoleKey, bucket };
@@ -17,7 +24,10 @@ export function getSupabaseConfig(): SupabaseConfig | null {
 
 export function missingSupabaseResponse() {
   return Response.json(
-    { error: "Supabase is not connected. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel." },
+    {
+      error:
+        "Supabase is not connected. Add SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL, plus SUPABASE_SERVICE_ROLE_KEY, in this Vercel project's Production environment variables.",
+    },
     { status: 503 },
   );
 }
