@@ -18,6 +18,27 @@ type Topic = {
   sortOrder: number;
 };
 
+type ApiDiagnostics = {
+  hasUrl?: boolean;
+  hasServiceRoleKey?: boolean;
+  hasBucket?: boolean;
+  bucketFallsBackToPhotos?: boolean;
+};
+
+function apiStatusMessage(
+  data: { error?: string; message?: string; diagnostics?: ApiDiagnostics },
+  fallback: string,
+) {
+  const base = data.error || data.message || fallback;
+  const diagnostics = data.diagnostics;
+
+  if (!diagnostics) return base;
+
+  return `${base} Vercel sees: URL ${diagnostics.hasUrl ? "yes" : "no"}, service role key ${
+    diagnostics.hasServiceRoleKey ? "yes" : "no"
+  }, storage bucket ${diagnostics.hasBucket ? "yes" : "no, using photos"}.`;
+}
+
 export default function Studio() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -116,7 +137,12 @@ export default function Studio() {
       const signedUrlResult = await signedUrlResponse.json().catch(() => ({}));
 
       if (!signedUrlResponse.ok || !signedUrlResult.signedUrl || !signedUrlResult.storagePath) {
-        setStatus(signedUrlResult.error ?? `Could not prepare the photo upload. Status ${signedUrlResponse.status}.`);
+        setStatus(
+          apiStatusMessage(
+            signedUrlResult,
+            `Could not prepare the photo upload. Status ${signedUrlResponse.status}.`,
+          ),
+        );
         return;
       }
 
@@ -147,7 +173,11 @@ export default function Studio() {
         }),
       });
       const result = await response.json().catch(() => ({}));
-      setStatus(response.ok ? "Saved" : result.error ?? `Could not save the photo. Status ${response.status}.`);
+      setStatus(
+        response.ok
+          ? "Saved"
+          : apiStatusMessage(result, `Could not save the photo. Status ${response.status}.`),
+      );
       if (!response.ok) return;
 
       form.reset();
@@ -176,7 +206,7 @@ export default function Studio() {
     }
 
     const data = await response.json().catch(() => ({}));
-    setTopicStatus(data.error ?? "Could not add the topic");
+    setTopicStatus(apiStatusMessage(data, "Could not add the topic"));
   }
 
   async function renameTopic(topic: Topic, name: string) {
@@ -239,6 +269,7 @@ export default function Studio() {
             onChange={(event) => setKey(event.target.value)}
             placeholder="Passphrase"
             aria-label="Studio passphrase"
+            type="password"
           />
           <button type="submit">Enter</button>
           <p aria-live="polite">{gateStatus}</p>
