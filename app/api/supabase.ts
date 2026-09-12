@@ -23,10 +23,26 @@ export function getSupabaseConfig(): SupabaseConfig | null {
 }
 
 export function missingSupabaseResponse() {
+  const hasUrl = Boolean(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const hasServiceRoleKey = Boolean(
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_SERVICE_KEY ||
+      process.env.SUPABASE_SERVICE_ROLE,
+  );
+  const hasBucket = Boolean(
+    process.env.SUPABASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET,
+  );
+
   return Response.json(
     {
       error:
         "Supabase is not connected. Add SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL, plus SUPABASE_SERVICE_ROLE_KEY, in this Vercel project's Production environment variables.",
+      diagnostics: {
+        hasUrl,
+        hasServiceRoleKey,
+        hasBucket,
+        bucketFallsBackToPhotos: !hasBucket,
+      },
     },
     { status: 503 },
   );
