@@ -10,6 +10,7 @@ export function getSupabaseConfig(): SupabaseConfig | null {
   const rawUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const url = rawUrl?.replace(/\/$/, "");
   const serviceRoleKey =
+    process.env.SUPABASE_SECRET_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SERVICE_KEY ||
     process.env.SUPABASE_SERVICE_ROLE;
@@ -25,7 +26,8 @@ export function getSupabaseConfig(): SupabaseConfig | null {
 export function missingSupabaseResponse() {
   const hasUrl = Boolean(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
   const hasServiceRoleKey = Boolean(
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
       process.env.SUPABASE_SERVICE_KEY ||
       process.env.SUPABASE_SERVICE_ROLE,
   );
@@ -36,7 +38,7 @@ export function missingSupabaseResponse() {
   return Response.json(
     {
       error:
-        "Supabase is not connected. Add SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL, plus SUPABASE_SERVICE_ROLE_KEY, in this Vercel project's Production environment variables.",
+        "Supabase is not connected. Add SUPABASE_URL and SUPABASE_SECRET_KEY in this Vercel project's Production environment variables.",
       diagnostics: {
         hasUrl,
         hasServiceRoleKey,
@@ -48,6 +50,18 @@ export function missingSupabaseResponse() {
   );
 }
 
+function supabaseAuthHeaders(key: string): Record<string, string> {
+  const headers: Record<string, string> = { apikey: key };
+
+  // Modern sb_secret keys belong only in apikey. Legacy service_role JWTs
+  // still require the Bearer header for backward compatibility.
+  if (!key.startsWith("sb_secret_")) {
+    headers.authorization = `Bearer ${key}`;
+  }
+
+  return headers;
+}
+
 export async function supabaseRequest(path: string, init: RequestInit = {}) {
   const config = getSupabaseConfig();
   if (!config) throw new Error("Missing Supabase configuration");
@@ -55,8 +69,7 @@ export async function supabaseRequest(path: string, init: RequestInit = {}) {
   return fetch(`${config.url}${path}`, {
     ...init,
     headers: {
-      apikey: config.serviceRoleKey,
-      authorization: `Bearer ${config.serviceRoleKey}`,
+      ...supabaseAuthHeaders(config.serviceRoleKey),
       ...(init.body instanceof FormData ? {} : { "content-type": "application/json" }),
       ...init.headers,
     },
@@ -76,8 +89,7 @@ export async function createSignedUploadUrl(path: string) {
   return fetch(`${config.url}/storage/v1/object/upload/sign/${config.bucket}/${encodeURIComponent(path)}`, {
     method: "POST",
     headers: {
-      apikey: config.serviceRoleKey,
-      authorization: `Bearer ${config.serviceRoleKey}`,
+      ...supabaseAuthHeaders(config.serviceRoleKey),
       "content-type": "application/json",
     },
     body: JSON.stringify({ expiresIn: 600 }),
@@ -91,8 +103,7 @@ export async function uploadPhotoFile(path: string, file: File) {
   return fetch(`${config.url}/storage/v1/object/${config.bucket}/${path}`, {
     method: "POST",
     headers: {
-      apikey: config.serviceRoleKey,
-      authorization: `Bearer ${config.serviceRoleKey}`,
+      ...supabaseAuthHeaders(config.serviceRoleKey),
       "content-type": file.type,
       "x-upsert": "false",
     },
@@ -107,8 +118,7 @@ export async function deletePhotoFile(path: string) {
   return fetch(`${config.url}/storage/v1/object/${config.bucket}`, {
     method: "DELETE",
     headers: {
-      apikey: config.serviceRoleKey,
-      authorization: `Bearer ${config.serviceRoleKey}`,
+      ...supabaseAuthHeaders(config.serviceRoleKey),
       "content-type": "application/json",
     },
     body: JSON.stringify({ prefixes: [path] }),
