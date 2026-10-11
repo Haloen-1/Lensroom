@@ -2,14 +2,21 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useSiteCopy } from "./site-copy-provider";
+import { Icon } from "./icons";
 
-const themes = ["paper", "sage", "ink", "silver"];
+const themes = [
+  { id: "paper", label: "Paper" },
+  { id: "sage", label: "Forest" },
+  { id: "ink", label: "Ink" },
+  { id: "silver", label: "Rose" },
+];
 let temporaryTheme = "paper";
 
 function readTheme() {
   try {
     const value = localStorage.getItem("lensroom-theme");
-    return value && themes.includes(value) ? value : temporaryTheme;
+    return themes.some((theme) => theme.id === value) ? value! : temporaryTheme;
   } catch {
     return temporaryTheme;
   }
@@ -26,37 +33,39 @@ function subscribeTheme(callback: () => void) {
 
 function chooseTheme(value: string) {
   temporaryTheme = value;
-  try {
-    localStorage.setItem("lensroom-theme", value);
-  } catch {}
+  try { localStorage.setItem("lensroom-theme", value); } catch {}
   window.dispatchEvent(new Event("lensroom-theme-change"));
 }
 
-export default function SiteHeader({ active }: { active: "gallery" | "studio" }) {
-  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "paper");
+export function StudioLink({ active = false }: { active?: boolean }) {
+  const { t } = useSiteCopy();
+  return (
+    <Link href="/studio" className="studio-icon-link" aria-label={t("Studio")} aria-current={active ? "page" : undefined}>
+      <Icon name="aperture" />
+      <span className="icon-tooltip" aria-hidden="true">{t("Studio")}</span>
+    </Link>
+  );
+}
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
+export default function SiteHeader({ active }: { active: "gallery" | "studio" | "admin" }) {
+  const { t } = useSiteCopy();
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "paper");
+  useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
 
   return (
     <header className="masthead">
-      <Link className="brand" href="/" aria-label="Lensroom home">Lensroom<span aria-hidden="true">.</span></Link>
-      <nav className="site-nav" aria-label="Main navigation">
-        <Link href="/" aria-current={active === "gallery" ? "page" : undefined}>Gallery</Link>
-        <Link href="/studio" aria-current={active === "studio" ? "page" : undefined}>Studio</Link>
+      <Link className="brand" href="/" aria-label={t("Lensroom home")}>{t("Lensroom")}</Link>
+      <nav className="site-nav" aria-label={t("Main navigation")}>
+        <Link href="/" aria-current={active === "gallery" ? "page" : undefined}>{t("Gallery")}</Link>
+        <StudioLink active={active === "studio"} />
       </nav>
-      <div className="theme-switcher" role="group" aria-label="Color scheme">
+      <div className="theme-switcher" role="group" aria-label={t("Color scheme")}>
         {themes.map((item) => (
-          <button
-            key={item}
-            type="button"
-            className={`theme-swatch theme-${item}`}
-            aria-label={`${item} color scheme`}
-            title={`${item.charAt(0).toUpperCase()}${item.slice(1)} color scheme`}
-            aria-pressed={theme === item}
-            onClick={() => chooseTheme(item)}
-          ><span aria-hidden="true" /></button>
+          <button key={item.id} type="button" className={`theme-swatch theme-${item.id}`}
+            aria-label={`${t(item.label)} ${t("Color scheme")}`} title={`${item.label} color scheme`}
+            aria-pressed={theme === item.id} onClick={() => chooseTheme(item.id)}>
+            <span aria-hidden="true" />
+          </button>
         ))}
       </div>
     </header>

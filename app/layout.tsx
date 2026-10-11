@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SiteCopyProvider } from "./components/site-copy-provider";
 
 export const metadata: Metadata = {
   title: "Lensroom",
@@ -17,7 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><SiteCopyProvider>{children}</SiteCopyProvider></body>
     </html>
   );
 }

@@ -1,5 +1,6 @@
 import { deletePhotoFile, getSupabaseConfig, missingSupabaseResponse, supabaseRequest } from "../../supabase";
 import { requireStudioSession } from "../../studio-auth";
+import { commaValues, photoTopics } from "../../../photo-metadata";
 
 type UpdatePayload = {
   title?: string;
@@ -14,18 +15,27 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!getSupabaseConfig()) return missingSupabaseResponse();
 
   const { id } = await context.params;
-  const payload = (await request.json()) as UpdatePayload;
-  const title = payload.title?.trim() || "Untitled";
-  const category = payload.category?.trim() || "Unsorted";
-  const labels = payload.labels?.trim() || "";
-  const notes = payload.notes?.trim() || "";
+  const payload = await request.json().catch(() => null) as UpdatePayload | null;
+  if (!payload || typeof payload !== "object" || ["title", "category", "labels", "notes"].some((field) =>
+    field in payload && typeof payload[field as keyof UpdatePayload] !== "string",
+  )) return Response.json({ error: "Invalid photo details." }, { status: 400 });
+  const updates: UpdatePayload = {};
+  if (payload.title !== undefined) updates.title = payload.title.trim() || "Untitled";
+  if (payload.category !== undefined) updates.category = photoTopics(payload.category).join(", ");
+  if (payload.labels !== undefined) updates.labels = commaValues(payload.labels).join(", ");
+  if (payload.notes !== undefined) updates.notes = payload.notes;
+  if (!Object.keys(updates).length) return Response.json({ error: "No changes to save." }, { status: 400 });
 
-  const response = await supabaseRequest(`/rest/v1/photos?id=eq.${encodeURIComponent(id)}`, {
+  const response = await supabaseRequest(`/rest/v1/photos?id=eq.${encodeURIComponent(id)}&select=id`, {
     method: "PATCH",
-    body: JSON.stringify({ title, category, labels, notes, updated_at: new Date().toISOString() }),
+    headers: { prefer: "return=representation" },
+    body: JSON.stringify({ ...updates, updated_at: new Date().toISOString() }),
   });
 
-  return Response.json({ ok: response.ok }, { status: response.ok ? 200 : 500 });
+  if (!response.ok) return Response.json({ error: "Could not save photo changes. Please try again." }, { status: 500 });
+  const rows = await response.json();
+  if (!rows.length) return Response.json({ error: "This photo no longer exists. Refresh Studio." }, { status: 404 });
+  return Response.json({ ok: true });
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {

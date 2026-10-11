@@ -3,6 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import SiteHeader from "../components/site-header";
 import Link from "next/link";
+import { useSiteCopy } from "../components/site-copy-provider";
+import PhotoEditor from "../components/photo-editor";
+import { commaValues, photoTopics } from "../photo-metadata";
 
 type Photo = {
   id: number;
@@ -42,6 +45,7 @@ function apiStatusMessage(
 }
 
 export default function Studio() {
+  const { t } = useSiteCopy();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [unlocked, setUnlocked] = useState(false);
@@ -168,8 +172,8 @@ export default function Studio() {
           storagePath: signedUrlResult.storagePath,
           filename: file.name,
           title: String(data.get("title") || file.name),
-          category: String(data.get("category") || "Unsorted"),
-          labels: String(data.get("labels") || ""),
+          category: photoTopics(String(data.get("category") || "")).join(", "),
+          labels: commaValues(String(data.get("labels") || "")).join(", "),
           notes: String(data.get("notes") || ""),
           contentType: file.type,
           size: file.size,
@@ -241,18 +245,8 @@ export default function Studio() {
       body: JSON.stringify({ id: topic.id }),
     });
 
-    setTopicStatus(response.ok ? "Topic deleted; photos moved to Unsorted" : "Could not delete the topic");
+    setTopicStatus(response.ok ? "Topic deleted; other photo topics kept" : "Could not delete the topic");
     loadPhotos();
-  }
-
-  async function updatePhoto(photo: Photo, field: keyof Photo, value: string) {
-    const next = { ...photo, [field]: value };
-    setPhotos((current) => current.map((item) => (item.id === photo.id ? next : item)));
-    await fetch(`/api/photos/${photo.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(next),
-    });
   }
 
   async function deletePhoto(photo: Photo) {
@@ -266,21 +260,21 @@ export default function Studio() {
         <SiteHeader active="studio" />
         <section className="studio-gate">
           <form onSubmit={unlock}>
-            <p className="eyebrow">Lensroom / Studio</p>
-            <h1>Welcome back.</h1>
+            <p className="eyebrow">{t("Lensroom / Studio")}</p>
+            <h1>{t("Welcome back.")}</h1>
             <label className="field">
-              <span>Passphrase</span>
+              <span>{t("Passphrase")}</span>
               <input
                 value={key}
                 onChange={(event) => setKey(event.target.value)}
-                aria-label="Studio passphrase"
+                aria-label={t("Studio passphrase")}
                 type="password"
                 autoComplete="current-password"
                 required
               />
             </label>
-            <button type="submit" disabled={gateStatus === "Checking"}>{gateStatus === "Checking" ? "Checking..." : "Enter Studio"}</button>
-            <p className="form-status" aria-live="polite">{gateStatus}</p>
+            <button type="submit" disabled={gateStatus === "Checking"}>{gateStatus === "Checking" ? t("Checking...") : t("Enter Studio")}</button>
+            <p className="form-status" aria-live="polite">{t(gateStatus)}</p>
           </form>
         </section>
       </main>
@@ -291,22 +285,23 @@ export default function Studio() {
     <main className="studio-shell">
       <SiteHeader active="studio" />
       <div className="studio-heading">
-        <div><p className="eyebrow">Your collection</p><h1>Studio</h1></div>
-        <nav className="section-nav" aria-label="Studio sections">
-          <a href="#upload">Upload</a>
-          <a href="#photographs">Photographs</a>
-          <a href="#topics">Topics</a>
-          <a href="#access">Access</a>
+        <div><p className="eyebrow">{t("Your collection")}</p><h1>{t("Studio")}</h1></div>
+        <nav className="section-nav" aria-label={t("Studio sections")}>
+          <a href="#upload">{t("Upload")}</a>
+          <a href="#photographs">{t("Photographs")}</a>
+          <a href="#topics">{t("Topics")}</a>
+          <a href="#access">{t("Access")}</a>
+          <Link href="/admin">{t("Text admin")}</Link>
         </nav>
       </div>
 
       <section id="upload" className="studio-panel">
-        <h2>New photograph</h2>
+        <h2>{t("New photograph")}</h2>
         <form className="upload-form" onSubmit={upload}>
           <div className="upload-file field-wide">
             <label className="upload-picker" htmlFor="photo-upload">
-              <span>Choose photo</span>
-              <small>{selectedFileName || "No file selected"}</small>
+              <span>{t("Choose photo")}</span>
+              <small>{selectedFileName || t("No file selected")}</small>
             </label>
             <input
               id="photo-upload"
@@ -318,89 +313,64 @@ export default function Studio() {
               onChange={(event) => setSelectedFileName(event.target.files?.[0]?.name ?? "")}
             />
           </div>
-          <label className="field"><span>Title</span><input name="title" placeholder="Untitled" /></label>
-          <label className="field"><span>Topic</span><input name="category" list="topic-options" placeholder="Unsorted" /></label>
-          <datalist id="topic-options">
-            {topics.map((topic) => <option key={topic.id} value={topic.name} />)}
-          </datalist>
-          <label className="field field-wide"><span>Labels</span><input name="labels" placeholder="Travel, architecture, evening" /></label>
-          <label className="field field-wide"><span>Notes</span><textarea name="notes" /></label>
+          <label className="field"><span>{t("Title")}</span><input name="title" placeholder={t("Untitled")} /></label>
+          <label className="field"><span>{t("Topics (comma-separated)")}</span><input name="category" placeholder={t("Color, Rule of Thirds")} /></label>
+          <label className="field field-wide"><span>{t("Labels (comma-separated)")}</span><input name="labels" placeholder={t("Travel, architecture, evening")} /></label>
+          <label className="field field-wide"><span>{t("Notes")}</span><textarea name="notes" /></label>
           <div className="form-actions field-wide">
-            <p className="form-status" aria-live="polite">{status}</p>
-            <button type="submit" disabled={isUploading}>{isUploading ? "Uploading..." : "Save photo"}</button>
+            <p className="form-status" aria-live="polite">{t(status)}</p>
+            <button type="submit" disabled={isUploading}>{isUploading ? t("Uploading...") : t("Save photo")}</button>
           </div>
         </form>
       </section>
 
-      <section id="photographs" className="studio-panel studio-panel-compact" aria-label="Uploaded photos">
-        <div className="section-heading"><h2>Photographs</h2><span className="count-badge">{photos.length}</span></div>
+      <section id="photographs" className="studio-panel studio-panel-compact" aria-label={t("Uploaded photos")}>
+        <div className="section-heading"><h2>{t("Photographs")}</h2><span className="count-badge">{photos.length}</span></div>
         <div className="studio-list">
-          {!photos.length && <p className="section-empty">No photographs yet.</p>}
+          {!photos.length && <p className="section-empty">{t("No photographs yet.")}</p>}
           {photos.map((photo) => (
-            <article key={photo.id} className="studio-item">
-              <img src={photo.imageUrl} alt={photo.title} loading="lazy" />
-              <div className="photo-fields">
-                <label className="field">
-                  <span>Title</span>
-                  <input value={photo.title} onChange={(event) => updatePhoto(photo, "title", event.target.value)} aria-label="Photo title" />
-                </label>
-                <label className="field">
-                  <span>Topic</span>
-                  <input value={photo.category} onChange={(event) => updatePhoto(photo, "category", event.target.value)} aria-label="Photo category" list="topic-options" />
-                </label>
-                <label className="field field-wide">
-                  <span>Labels</span>
-                  <input value={photo.labels} onChange={(event) => updatePhoto(photo, "labels", event.target.value)} aria-label="Photo labels" />
-                </label>
-                <label className="field field-wide">
-                  <span>Notes</span>
-                  <textarea value={photo.notes} onChange={(event) => updatePhoto(photo, "notes", event.target.value)} aria-label="Photo notes" />
-                </label>
-                <div className="form-actions field-wide">
-                  <button type="button" className="danger-button" onClick={() => deletePhoto(photo)}>Delete photo</button>
-                </div>
-              </div>
-            </article>
+            <PhotoEditor key={photo.id} photo={photo} onDelete={deletePhoto}
+              onSaved={(savedPhoto) => setPhotos((current) => current.map((item) => item.id === savedPhoto.id ? savedPhoto : item))} />
           ))}
         </div>
       </section>
 
       <section id="topics" className="studio-panel studio-panel-compact">
-        <div className="section-heading"><h2>Topics</h2><span className="count-badge">{topics.length}</span></div>
+        <div className="section-heading"><h2>{t("Topics")}</h2><span className="count-badge">{topics.length}</span></div>
         <form className="inline-form" onSubmit={addTopic}>
-          <label className="field"><span>New topic</span>
+          <label className="field"><span>{t("New topics (comma-separated)")}</span>
             <input value={topicName} onChange={(event) => setTopicName(event.target.value)} required />
           </label>
-          <button type="submit">Add topic</button>
+          <button type="submit">{t("Add topics")}</button>
         </form>
-        <div className="topic-editor" role="region" tabIndex={0} aria-label="Edit topics">
-          {!topics.length && <p className="section-empty">No topics yet.</p>}
+        <div className="topic-editor" role="region" tabIndex={0} aria-label={t("Edit topics")}>
+          {!topics.length && <p className="section-empty">{t("No topics yet.")}</p>}
           {topics.map((topic) => (
             <div className="topic-row" key={topic.id}>
               <input defaultValue={topic.name} onBlur={(event) => renameTopic(topic, event.target.value)} aria-label={`Rename ${topic.name}`} />
-              <button type="button" className="ghost-button" aria-label={`Delete topic ${topic.name}`} onClick={() => deleteTopic(topic)}>Delete</button>
+              <button type="button" className="ghost-button" aria-label={`Delete topic ${topic.name}`} onClick={() => deleteTopic(topic)}>{t("Delete")}</button>
             </div>
           ))}
         </div>
-        <p className="form-status" aria-live="polite">{topicStatus}</p>
+        <p className="form-status" aria-live="polite">{t(topicStatus)}</p>
       </section>
 
       <section id="access" className="studio-panel studio-panel-compact">
-        <h2>Studio access</h2>
+        <h2>{t("Studio access")}</h2>
         <form className="upload-form" onSubmit={changePassphrase}>
-          <label className="field"><span>Current passphrase</span>
+          <label className="field"><span>{t("Current passphrase")}</span>
             <input value={oldPassphrase} onChange={(event) => setOldPassphrase(event.target.value)} type="password" autoComplete="current-password" required />
           </label>
-          <label className="field"><span>New passphrase</span>
+          <label className="field"><span>{t("New passphrase")}</span>
             <input value={newPassphrase} onChange={(event) => setNewPassphrase(event.target.value)} type="password" autoComplete="new-password" required />
           </label>
           <div className="form-actions field-wide">
-            <p className="form-status" aria-live="polite">{passphraseStatus}</p>
-            <button type="submit" className="secondary-button">Update passphrase</button>
+            <p className="form-status" aria-live="polite">{t(passphraseStatus)}</p>
+            <button type="submit" className="secondary-button">{t("Update passphrase")}</button>
           </div>
         </form>
       </section>
-      <footer className="site-footer"><span>Lensroom</span><Link href="/">Back to gallery</Link></footer>
+      <footer className="site-footer"><span>{t("Lensroom")}</span><Link href="/">{t("Back to gallery")}</Link></footer>
     </main>
   );
 }

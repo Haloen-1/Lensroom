@@ -6,6 +6,7 @@ import {
   uploadPhotoFile,
 } from "../supabase";
 import { requireStudioSession } from "../studio-auth";
+import { commaValues, photoTopics } from "../../photo-metadata";
 
 type PhotoRow = {
   id: number;
@@ -62,8 +63,8 @@ async function insertPhotoMetadata(photo: {
       storage_path: photo.storagePath,
       filename: photo.filename,
       title: photo.title,
-      category: photo.category,
-      labels: photo.labels,
+      category: photoTopics(photo.category).join(", "),
+      labels: commaValues(photo.labels).join(", "),
       notes: photo.notes,
       content_type: photo.contentType,
       size: photo.size,

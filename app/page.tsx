@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import SiteHeader from "./components/site-header";
-import Link from "next/link";
+import SiteHeader, { StudioLink } from "./components/site-header";
+import { useSiteCopy } from "./components/site-copy-provider";
+import TopicMenu from "./components/topic-menu";
+import { commaValues, hasTopic, photoTopics, topicNames } from "./photo-metadata";
 
 type Photo = {
   id: number;
@@ -15,6 +17,7 @@ type Photo = {
 type Topic = { id: number; name: string; sortOrder: number };
 
 export default function Home() {
+  const { t } = useSiteCopy();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [activeCategory, setActiveCategory] = useState("");
@@ -44,42 +47,36 @@ export default function Home() {
   }, [attempt]);
 
   const categories = useMemo(
-    () => Array.from(new Set([
+    () => topicNames([
       ...topics.map((topic) => topic.name),
-      ...photos.map((photo) => photo.category),
-    ])).sort((a, b) => a.localeCompare(b)),
+      ...photos.flatMap((photo) => photoTopics(photo.category)),
+    ]),
     [topics, photos],
   );
   const filteredPhotos = activeCategory
-    ? photos.filter((photo) => photo.category === activeCategory)
+    ? photos.filter((photo) => hasTopic(photo.category, activeCategory))
     : photos;
-  const heading = activeCategory || "Overview";
+  const heading = activeCategory || t("Overview");
 
   return (
     <main className="site-shell">
       <SiteHeader active="gallery" />
       <section className="intro" aria-labelledby="gallery-title">
-        <p className="eyebrow">Photographs</p>
+        <p className="eyebrow">{t("Photographs")}</p>
         <h1 id="gallery-title">{heading}</h1>
       </section>
 
       <div className="gallery-toolbar">
         <p className="gallery-count" role="status">
-          {loading ? "Loading photographs" : failed ? "Gallery unavailable" :
-            `${filteredPhotos.length} ${filteredPhotos.length === 1 ? "photograph" : "photographs"}`}
+          {loading ? t("Loading photographs") : failed ? t("Gallery unavailable") :
+            `${filteredPhotos.length} ${filteredPhotos.length === 1 ? t("photograph") : t("photographs")}`}
         </p>
-        <label className="topic-filter">
-          <span>Topic</span>
-          <select
-            value={activeCategory}
-            onChange={(event) => setActiveCategory(event.target.value)}
-            title={heading}
-            disabled={loading || failed}
-          >
-            <option value="">Overview</option>
-            {categories.map((category) => <option key={category} value={category}>{category}</option>)}
-          </select>
-        </label>
+        <TopicMenu value={activeCategory} onChange={setActiveCategory} disabled={loading || failed}
+          options={[
+            { value: "", label: t("Overview"), count: photos.length },
+            ...categories.map((category) => ({ value: category, label: category, count: photos.filter((photo) => hasTopic(photo.category, category)).length })),
+          ]}
+        />
       </div>
 
       {loading ? (
@@ -88,19 +85,20 @@ export default function Home() {
         </div>
       ) : failed ? (
         <div className="empty-state" role="alert">
-          <h2>Photographs couldn&apos;t load.</h2>
+          <h2>{t("Photographs couldn't load.")}</h2>
           <button className="secondary-button" onClick={() => {
             setLoading(true);
             setFailed(false);
             setAttempt((value) => value + 1);
-          }}>Try again</button>
+          }}>{t("Try again")}</button>
         </div>
       ) : filteredPhotos.length ? (
-        <section className="photo-grid" aria-label={`${heading} gallery`}>
+        <section className="photo-grid" key={activeCategory} aria-label={`${heading} gallery`}>
           {filteredPhotos.map((photo, index) => (
             <article
               className="photo-card"
               key={photo.id}
+              style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
               tabIndex={0}
               aria-label={`${photo.title}, ${photo.category}${photo.labels ? `, ${photo.labels}` : ""}`}
               onContextMenu={(event) => event.preventDefault()}
@@ -113,19 +111,19 @@ export default function Home() {
               />
               <div className="hover-label">
                 <strong>{photo.title}</strong>
-                <span>{photo.category}</span>
-                {photo.labels ? <em>{photo.labels}</em> : null}
+                <span>{photoTopics(photo.category).join(", ")}</span>
+                {commaValues(photo.labels).length ? <em>{commaValues(photo.labels).join(", ")}</em> : null}
               </div>
             </article>
           ))}
         </section>
       ) : (
         <div className="empty-state">
-          <h2>{activeCategory ? "No photographs in this topic yet." : "No photographs yet."}</h2>
-          {activeCategory && <button className="secondary-button" onClick={() => setActiveCategory("")}>View all photographs</button>}
+          <h2>{activeCategory ? t("No photographs in this topic yet.") : t("No photographs yet.")}</h2>
+          {activeCategory && <button className="secondary-button" onClick={() => setActiveCategory("")}>{t("View all photographs")}</button>}
         </div>
       )}
-      <footer className="site-footer"><span>Lensroom</span><Link href="/studio">Studio</Link></footer>
+      <footer className="site-footer"><span>{t("Lensroom")}</span><StudioLink /></footer>
     </main>
   );
 }
