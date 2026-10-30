@@ -17,6 +17,7 @@ export const textGroups = {
     "Photographs",
     "Overview",
     "Topic",
+    "Techniques",
     "Topics",
     "Loading photographs",
     "Gallery unavailable",
@@ -65,7 +66,7 @@ export const textGroups = {
     "Delete photo",
     "Could not save changes. Please try again."
   ],
-  "Topic editing": [
+  "Technique editing": [
     "New topics (comma-separated)",
     "Add topics",
     "No topics yet.",
@@ -107,6 +108,28 @@ export type SiteCopy = Record<string, string>;
 export const defaultCopy: SiteCopy = Object.fromEntries(
   Object.values(textGroups).flat().map((text) => [text, text]),
 );
+const renamedText: SiteCopy = {
+  "Topics": "Techniques",
+  "Topics (comma-separated)": "Techniques (comma-separated)",
+  "Labels (comma-separated)": "Topic (comma-separated)",
+  "Notes": "Artist statement",
+  "Photo topics": "Photo techniques",
+  "Photo labels": "Photo topics",
+  "Photo notes": "Artist statement",
+  "New topics (comma-separated)": "New techniques (comma-separated)",
+  "Add topics": "Add techniques",
+  "Edit topics": "Edit techniques",
+  "No topics yet.": "No techniques yet.",
+  "Topic added": "Technique added",
+  "Topic updated": "Technique updated",
+  "Topic deleted; other photo topics kept": "Technique deleted; other techniques kept",
+  "Paper": "Linen",
+  "Forest": "Sage",
+  "Ink": "Graphite",
+  "Rose": "Mist",
+};
+Object.assign(defaultCopy, renamedText);
+
 defaultCopy["Browser title"] = "Lensroom";
 defaultCopy["Browser description"] = "An image-first portfolio with topic galleries and private photo labeling.";
 
@@ -118,5 +141,8 @@ export function validCopy(value: unknown): value is SiteCopy {
 }
 
 export function mergeCopy(value: unknown): SiteCopy {
-  return { ...defaultCopy, ...(validCopy(value) ? value : {}) };
+  const overrides = validCopy(value) ? { ...value } : {};
+  // Upgrade old default wording, while retaining deliberate text customization.
+  for (const key of Object.keys(renamedText)) if (overrides[key] === key) delete overrides[key];
+  return { ...defaultCopy, ...overrides };
 }

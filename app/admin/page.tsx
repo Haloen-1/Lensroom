@@ -96,7 +96,7 @@ export default function TextAdmin() {
 
   const fields = Object.entries(textGroups).flatMap(([section, keys]) =>
     keys.filter((key) => query.trim()
-      ? (key + " " + draft[key]).toLowerCase().includes(query.trim().toLowerCase())
+      ? (key + " " + defaultCopy[key] + " " + draft[key]).toLowerCase().includes(query.trim().toLowerCase())
       : section === group).map((key) => ({ key, section })),
   );
 
@@ -163,7 +163,7 @@ export default function TextAdmin() {
               {!fields.length && <p className="section-empty">No matching text</p>}
               {fields.map(({ key, section }) => <div className="admin-text-field" key={key}>
                 <label className="field">
-                  <span>{key}</span>
+                  <span>{defaultCopy[key]}</span>
                   {query && <small>{section}</small>}
                   <textarea aria-label={key} maxLength={500} required disabled={busy}
                     rows={2} value={draft[key]} onChange={(event) => edit(key, event.target.value)} />

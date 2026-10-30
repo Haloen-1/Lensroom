@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import SiteHeader from "../components/site-header";
 import Link from "next/link";
 import { useSiteCopy } from "../components/site-copy-provider";
@@ -46,6 +46,10 @@ function apiStatusMessage(
 
 export default function Studio() {
   const { t } = useSiteCopy();
+  const photoRequest = useRef(0);
+  const [photosLoading, setPhotosLoading] = useState(true);
+  const [photosError, setPhotosError] = useState("");
+  const [sessionLoading, setSessionLoading] = useState(true);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [unlocked, setUnlocked] = useState(false);
@@ -61,21 +65,52 @@ export default function Studio() {
   const [isUploading, setIsUploading] = useState(false);
 
   const loadPhotos = () => {
-    fetch("/api/photos")
-      .then((response) => response.json())
-      .then((data: { photos: Photo[] }) => setPhotos(data.photos ?? []));
+    const requestId = ++photoRequest.current;
+    return fetch("/api/photos", { cache: "no-store", credentials: "same-origin", signal: AbortSignal.timeout(30000) })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.photos)) throw new Error(data.error || "Could not load saved photos.");
+        if (requestId === photoRequest.current) {
+          setPhotos(data.photos);
+          setPhotosError("");
+        }
+      })
+      .catch((error) => {
+        if (requestId === photoRequest.current) setPhotosError(error instanceof Error ? error.message : "Could not load saved photos.");
+      })
+      .finally(() => { if (requestId === photoRequest.current) setPhotosLoading(false); });
   };
 
   const loadTopics = () => {
-    fetch("/api/topics")
-      .then((response) => response.json())
-      .then((data: { topics: Topic[] }) => setTopics(data.topics ?? []));
+    return fetch("/api/topics", { cache: "no-store", signal: AbortSignal.timeout(30000) })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not load techniques.");
+        setTopics(data.topics ?? []);
+      }).catch(() => setTopicStatus("Could not load techniques. Please refresh."));
   };
 
   useEffect(() => {
-    loadPhotos();
-    loadTopics();
+    let cancelled = false;
+    fetch("/api/studio-passphrase", { cache: "no-store", signal: AbortSignal.timeout(30000) }).then(async (response) => {
+      if (cancelled) return;
+      if (response.ok) {
+        setUnlocked(true);
+        await Promise.all([loadPhotos(), loadTopics()]);
+      }
+    }).catch(() => {}).finally(() => { if (!cancelled) setSessionLoading(false); });
+    return () => { cancelled = true; };
   }, []);
+
+  async function signOut() {
+    if (document.querySelector('[data-dirty="true"]') && !window.confirm("Sign out without saving your photo edits?")) return;
+    const response = await fetch("/api/studio-passphrase", { method: "DELETE" }).catch(() => null);
+    if (!response?.ok) { setPhotosError("Could not sign out. Please retry."); return; }
+    photoRequest.current++;
+    setUnlocked(false);
+    setPhotos([]);
+    setPhotosError("");
+  }
 
   async function unlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,7 +126,8 @@ export default function Studio() {
         setUnlocked(true);
         setKey("");
         setGateStatus("");
-        loadTopics();
+        setPhotosLoading(true);
+        await Promise.all([loadPhotos(), loadTopics()]);
         return;
       }
       setGateStatus(response.status === 401 ? "That passphrase did not work." : "Studio is unavailable. Please try again.");
@@ -250,9 +286,19 @@ export default function Studio() {
   }
 
   async function deletePhoto(photo: Photo) {
-    setPhotos((current) => current.filter((item) => item.id !== photo.id));
-    await fetch(`/api/photos/${photo.id}`, { method: "DELETE" });
+    if (!window.confirm(`Delete "${photo.title}" permanently?`)) return;
+    try {
+      const response = await fetch(`/api/photos/${photo.id}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok || result.ok !== true) throw new Error(result.error || "Could not delete the photo.");
+      setPhotos((current) => current.filter((item) => item.id !== photo.id));
+      setPhotosError("");
+    } catch (error) {
+      setPhotosError(error instanceof Error ? error.message : "Could not delete the photo.");
+    }
   }
+
+  if (sessionLoading) return <main className="studio-shell"><SiteHeader active="studio" /><p role="status">Checking Studio session...</p></main>;
 
   if (!unlocked) {
     return (
@@ -292,6 +338,7 @@ export default function Studio() {
           <a href="#topics">{t("Topics")}</a>
           <a href="#access">{t("Access")}</a>
           <Link href="/admin">{t("Text admin")}</Link>
+          <button className="ghost-button" type="button" onClick={signOut}>Sign out</button>
         </nav>
       </div>
 
@@ -326,8 +373,15 @@ export default function Studio() {
 
       <section id="photographs" className="studio-panel studio-panel-compact" aria-label={t("Uploaded photos")}>
         <div className="section-heading"><h2>{t("Photographs")}</h2><span className="count-badge">{photos.length}</span></div>
+        <div className="photo-list-actions">
+          <button type="button" className="secondary-button" disabled={photosLoading} onClick={() => {
+            if (document.querySelector('[data-dirty="true"]') && !window.confirm("Reload saved photos? Unsaved edits will be kept where possible.")) return;
+            setPhotosLoading(true); void loadPhotos();
+          }}>{photosLoading ? "Loading saved photos..." : "Refresh saved photos"}</button>
+          {photosError && <p className="form-status" role="alert">{photosError}</p>}
+        </div>
         <div className="studio-list">
-          {!photos.length && <p className="section-empty">{t("No photographs yet.")}</p>}
+          {!photosLoading && !photosError && !photos.length && <p className="section-empty">{t("No photographs yet.")}</p>}
           {photos.map((photo) => (
             <PhotoEditor key={photo.id} photo={photo} onDelete={deletePhoto}
               onSaved={(savedPhoto) => setPhotos((current) => current.map((item) => item.id === savedPhoto.id ? savedPhoto : item))} />

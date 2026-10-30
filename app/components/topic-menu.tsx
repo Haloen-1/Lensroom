@@ -6,11 +6,12 @@ import { Icon } from "./icons";
 
 type TopicOption = { value: string; label: string; count: number };
 
-export default function TopicMenu({ options, value, onChange, disabled }: {
+export default function TopicMenu({ options, value, onChange, disabled, label = "Topic" }: {
   options: TopicOption[];
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  label?: string;
 }) {
   const { t } = useSiteCopy();
   const id = useId();
@@ -69,7 +70,7 @@ export default function TopicMenu({ options, value, onChange, disabled }: {
     <div className="topic-filter" ref={root} onBlur={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
     }}>
-      <span id={`${id}-label`}>{t("Topic")}</span>
+      <span id={`${id}-label`}>{t(label)}</span>
       <div className="topic-menu" data-open={expanded}>
         <button ref={trigger} type="button" role="combobox" className="topic-trigger"
           aria-labelledby={`${id}-label ${id}-value`} aria-expanded={expanded} aria-haspopup="listbox"
@@ -80,7 +81,7 @@ export default function TopicMenu({ options, value, onChange, disabled }: {
           <Icon name="chevron" />
         </button>
         <div className="topic-popover" aria-hidden={!expanded} inert={!expanded}>
-          <div className="topic-menu-heading">{t("Topics")}<span>{options.length - 1}</span></div>
+          <div className="topic-menu-heading">{t(label)}<span>{options.length - 1}</span></div>
           <div id={`${id}-list`} className="topic-options" role="listbox" aria-labelledby={`${id}-label`}>
             {options.map((option, index) => (
               <div key={option.value} id={`${id}-option-${index}`} role="option"

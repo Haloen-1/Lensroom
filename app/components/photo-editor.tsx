@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import PhotoImage from "./photo-image";
 import { useSiteCopy } from "./site-copy-provider";
 import { commaValues, photoTopics } from "../photo-metadata";
 
@@ -90,8 +91,8 @@ export default function PhotoEditor({ photo, onSaved, onDelete }: {
   }
 
   return (
-    <article className="studio-item" aria-label={`Edit ${photo.title}`}>
-      <img src={photo.imageUrl} alt={photo.title} loading="lazy" />
+    <article className="studio-item" aria-label={`Edit ${photo.title}`} data-dirty={dirty}>
+      <PhotoImage src={photo.imageUrl} alt={photo.title} thumbnail />
       <form className="photo-fields" onSubmit={save}>
         <label className="field"><span>{t("Title")}</span>
           <input value={draft.title} disabled={saving} onChange={(event) => edit("title", event.target.value)} aria-label={t("Photo title")} />
